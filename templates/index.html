@@ -1,0 +1,667 @@
+<!DOCTYPE html>
+<html lang="en" class="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CASE-MTH | Multi-Tier Continuum Workload Placement Dashboard</title>
+    <!-- Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Chart.js CDN -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <!-- Font Awesome Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    colors: {
+                        brand: {
+                            50: '#f0fdf4',
+                            500: '#22c55e',
+                            600: '#16a34a',
+                            700: '#15803d',
+                            900: '#14532d',
+                        },
+                        darkbg: '#0f172a',
+                        cardbg: '#1e293b',
+                        borderbg: '#334155'
+                    }
+                }
+            }
+        }
+    </script>
+    <style>
+        body { background-color: #0f172a; color: #f8fafc; font-family: system-ui, -apple-system, sans-serif; }
+        .custom-scrollbar::-webkit-scrollbar { width: 6px; height: 6px; }
+        .custom-scrollbar::-webkit-scrollbar-track { background: #1e293b; }
+        .custom-scrollbar::-webkit-scrollbar-thumb { background: #475569; border-radius: 3px; }
+    </style>
+</head>
+<body class="min-h-screen flex flex-col custom-scrollbar">
+
+    <!-- Navbar Header -->
+    <header class="bg-cardbg border-b border-borderbg sticky top-0 z-50 px-6 py-4 flex flex-wrap items-center justify-between shadow-lg">
+        <div class="flex items-center space-x-3">
+            <div class="w-10 h-10 rounded-lg bg-brand-600 flex items-center justify-center text-white text-xl font-bold shadow-md">
+                <i class="fa-solid fa-leaf"></i>
+            </div>
+            <div>
+                <h1 class="text-xl font-bold text-white tracking-wide">CASE-MTH Continuum Simulator</h1>
+                <p class="text-xs text-slate-400">Carbon-Aware &amp; Slack-Enriched Multi-Tier Hybrid Workload Placement</p>
+            </div>
+        </div>
+        <div class="flex items-center space-x-4 mt-2 sm:mt-0">
+            <span class="inline-flex items-center px-3 py-1 rounded-full text-xs font-medium bg-emerald-950 text-emerald-400 border border-emerald-800">
+                <span class="w-2 h-2 rounded-full bg-emerald-400 mr-2 animate-pulse"></span> 128 Heterogeneous Nodes Active
+            </span>
+            <button onclick="onTaskCountOrAlgChange()" class="bg-brand-600 hover:bg-brand-700 text-white px-4 py-2 rounded-lg text-sm font-semibold shadow-md transition flex items-center space-x-2">
+                <i class="fa-solid fa-play" id="sim-run-icon"></i>
+                <span id="sim-run-text">Run Simulation</span>
+            </button>
+        </div>
+    </header>
+
+    <main class="flex-1 p-6 max-w-7xl mx-auto w-full space-y-6">
+
+        <!-- Simulation Control Bar -->
+        <div class="bg-cardbg border border-borderbg rounded-xl p-5 shadow-md">
+            <div class="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
+                <div class="flex items-center space-x-3">
+                    <label class="text-sm font-semibold text-slate-300">Task Workload Size:</label>
+                    <select id="taskCountSelect" onchange="onTaskCountChange(false)" class="bg-slate-900 border border-borderbg rounded-lg px-3 py-1.5 text-sm font-semibold text-emerald-400 focus:outline-none focus:border-brand-500">
+                        <option value="10">10 Tasks (Quick Test)</option>
+                        <option value="3000" selected>3,000 Tasks</option>
+                        <option value="5000">5,000 Tasks</option>
+                        <option value="10000">10,000 Tasks</option>
+                        <option value="20000">20,000 Tasks</option>
+                        <option value="30000">30,000 Tasks</option>
+                        <option value="40000">40,000 Tasks</option>
+                        <option value="50000">50,000 Tasks</option>
+                        <option value="100000">100,000 Tasks (Full Paper Scale)</option>
+                    </select>
+                    <button onclick="onTaskCountChange(true)" class="bg-slate-800 hover:bg-slate-700 text-slate-300 border border-borderbg px-3 py-1.5 rounded-lg text-xs font-semibold shadow-sm transition flex items-center space-x-1.5" title="Generate brand new stochastic workload stream with random seed">
+                        <i class="fa-solid fa-shuffle text-emerald-400"></i>
+                        <span>Generate Fresh Workload</span>
+                    </button>
+                    <span class="text-xs text-slate-400" id="workload-gen-status">Fixed seed benchmark mode</span>
+                </div>
+                
+                <div class="flex flex-wrap items-center gap-3 text-xs">
+                    <span class="font-semibold text-slate-400">Compare Algorithms:</span>
+                    <label class="inline-flex items-center space-x-1.5 cursor-pointer">
+                        <input type="checkbox" value="case_mth" checked class="alg-checkbox accent-emerald-500 rounded">
+                        <span class="text-emerald-400 font-bold">CASE-MTH</span>
+                    </label>
+                    <label class="inline-flex items-center space-x-1.5 cursor-pointer">
+                        <input type="checkbox" value="sp" checked class="alg-checkbox accent-blue-500 rounded">
+                        <span class="text-slate-300">Static (SP)</span>
+                    </label>
+                    <label class="inline-flex items-center space-x-1.5 cursor-pointer">
+                        <input type="checkbox" value="las" checked class="alg-checkbox accent-blue-500 rounded">
+                        <span class="text-slate-300">Latency (LAS)</span>
+                    </label>
+                    <label class="inline-flex items-center space-x-1.5 cursor-pointer">
+                        <input type="checkbox" value="cos" checked class="alg-checkbox accent-blue-500 rounded">
+                        <span class="text-slate-300">Cost (COS)</span>
+                    </label>
+                    <label class="inline-flex items-center space-x-1.5 cursor-pointer">
+                        <input type="checkbox" value="green_dvfs" checked class="alg-checkbox accent-blue-500 rounded">
+                        <span class="text-slate-300">Green-DVFS</span>
+                    </label>
+                    <label class="inline-flex items-center space-x-1.5 cursor-pointer">
+                        <input type="checkbox" value="echs" checked class="alg-checkbox accent-blue-500 rounded">
+                        <span class="text-slate-300">ECHS</span>
+                    </label>
+                    <label class="inline-flex items-center space-x-1.5 cursor-pointer">
+                        <input type="checkbox" value="mopso" checked class="alg-checkbox accent-blue-500 rounded">
+                        <span class="text-slate-300">MOPSO-E</span>
+                    </label>
+                </div>
+            </div>
+        </div>
+
+        <!-- Top Metric Summary Cards -->
+        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+            <!-- Metric 1: Total Tasks -->
+            <div class="bg-cardbg border border-borderbg rounded-xl p-5 shadow-sm relative overflow-hidden">
+                <div class="flex items-center justify-between">
+                    <div>
+                        <p class="text-xs font-medium text-slate-400">Total Workload Tasks</p>
+                        <h3 class="text-2xl font-bold text-white mt-1" id="kpi-tasks">3,000</h3>
+                        <p class="text-xs text-slate-400 mt-1">Borg / PAI / DataCo Streams</p>
+                    </div>
+                    <div class="w-12 h-12 rounded-lg bg-indigo-950 text-indigo-400 flex items-center justify-center text-xl">
+                        <i class="fa-solid fa-microchip"></i>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Metric 2: Carbon Emissions & Abatement -->
+            <div class="bg-cardbg border border-emerald-900/50 rounded-xl p-5 shadow-sm relative overflow-hidden">
+                <div class="flex items-center justify-between">
+                    <div>
+                        <p class="text-xs font-medium text-slate-400">CASE-MTH Carbon (C<sub>total</sub>)</p>
+                        <div class="flex items-baseline space-x-2 mt-1">
+                            <h3 class="text-2xl font-bold text-emerald-400" id="kpi-carbon">0.03 <span class="text-xs font-normal">kg CO₂</span></h3>
+                            <span class="px-2 py-0.5 rounded text-xs font-bold bg-emerald-900 text-emerald-300 border border-emerald-700" id="kpi-abatement">+58.5% Abatement</span>
+                        </div>
+                        <p class="text-xs text-slate-400 mt-1">Operational Emissions Savings</p>
+                    </div>
+                    <div class="w-12 h-12 rounded-lg bg-emerald-950 text-emerald-400 flex items-center justify-center text-xl">
+                        <i class="fa-solid fa-cloud-sun"></i>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Metric 3: Energy Consumption -->
+            <div class="bg-cardbg border border-borderbg rounded-xl p-5 shadow-sm relative overflow-hidden">
+                <div class="flex items-center justify-between">
+                    <div>
+                        <p class="text-xs font-medium text-slate-400">Total Electrical Energy (E<sub>total</sub>)</p>
+                        <h3 class="text-2xl font-bold text-amber-400 mt-1" id="kpi-energy">0.14 <span class="text-xs font-normal">kWh</span></h3>
+                        <p class="text-xs text-slate-400 mt-1">Compute &amp; Network WAN</p>
+                    </div>
+                    <div class="w-12 h-12 rounded-lg bg-amber-950 text-amber-400 flex items-center justify-center text-xl">
+                        <i class="fa-solid fa-bolt"></i>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Metric 4: SLA Compliance -->
+            <div class="bg-cardbg border border-borderbg rounded-xl p-5 shadow-sm relative overflow-hidden">
+                <div class="flex items-center justify-between">
+                    <div>
+                        <p class="text-xs font-medium text-slate-400">SLA Compliance Rate</p>
+                        <h3 class="text-2xl font-bold text-sky-400 mt-1" id="kpi-sla">32.6%</h3>
+                        <p class="text-xs text-slate-400 mt-1" id="kpi-svr-sub">SVR Violation: 67.4%</p>
+                    </div>
+                    <div class="w-12 h-12 rounded-lg bg-sky-950 text-sky-400 flex items-center justify-center text-xl">
+                        <i class="fa-solid fa-clock"></i>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- 2x2 Interactive Chart Grid -->
+        <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+
+            <!-- Chart 1: Carbon Emissions Comparison -->
+            <div class="bg-cardbg border border-borderbg rounded-xl p-5 shadow-md">
+                <div class="flex items-center justify-between mb-4">
+                    <h3 class="text-base font-bold text-white flex items-center space-x-2">
+                        <i class="fa-solid fa-chart-bar text-emerald-400"></i>
+                        <span>Operational Carbon Emissions (C<sub>total</sub> kg CO₂)</span>
+                    </h3>
+                    <span class="text-xs text-slate-400">Lower is better</span>
+                </div>
+                <div class="h-64">
+                    <canvas id="carbonChart"></canvas>
+                </div>
+            </div>
+
+            <!-- Chart 2: 24-Hour Grid Carbon Intensity Profiles -->
+            <div class="bg-cardbg border border-borderbg rounded-xl p-5 shadow-md">
+                <div class="flex items-center justify-between mb-4">
+                    <h3 class="text-base font-bold text-white flex items-center space-x-2">
+                        <i class="fa-solid fa-chart-line text-sky-400"></i>
+                        <span>24-Hour Regional Grid Carbon Intensity CI<sub>k</sub>(t)</span>
+                    </h3>
+                    <span class="text-xs text-slate-400">gCO₂eq/kWh</span>
+                </div>
+                <div class="h-64">
+                    <canvas id="gridCarbonChart"></canvas>
+                </div>
+            </div>
+
+            <!-- Chart 3: Energy vs SLA Tradeoff -->
+            <div class="bg-cardbg border border-borderbg rounded-xl p-5 shadow-md">
+                <div class="flex items-center justify-between mb-4">
+                    <h3 class="text-base font-bold text-white flex items-center space-x-2">
+                        <i class="fa-solid fa-scale-unbalanced text-amber-400"></i>
+                        <span>Energy Consumption (kWh) &amp; SLA Violation Ratio (SVR %)</span>
+                    </h3>
+                </div>
+                <div class="h-64">
+                    <canvas id="energySlaChart"></canvas>
+                </div>
+            </div>
+
+            <!-- Chart 4: Tier Distribution -->
+            <div class="bg-cardbg border border-borderbg rounded-xl p-5 shadow-md">
+                <div class="flex items-center justify-between mb-4">
+                    <h3 class="text-base font-bold text-white flex items-center space-x-2">
+                        <i class="fa-solid fa-layer-group text-indigo-400"></i>
+                        <span>Workload Placement Tier Distribution</span>
+                    </h3>
+                    <span class="text-xs text-slate-400">Edge / Private / Public</span>
+                </div>
+                <div class="h-64">
+                    <canvas id="tierDistributionChart"></canvas>
+                </div>
+            </div>
+
+        </div>
+
+        <!-- Generated Workload Stream Browser Table -->
+        <div class="bg-cardbg border border-borderbg rounded-xl p-5 shadow-md space-y-4">
+            <div class="flex flex-col md:flex-row md:items-center justify-between gap-4">
+                <div>
+                    <h3 class="text-lg font-bold text-white flex items-center space-x-2">
+                        <i class="fa-solid fa-list-check text-brand-500"></i>
+                        <span>Generated Workload Stream Explorer</span>
+                    </h3>
+                    <p class="text-xs text-slate-400">Stage 1 trace extraction and Stage 2 synthetic telemetry augmentation stream (<span id="table-total-indicator" class="font-bold text-white">3,000 tasks</span>)</p>
+                </div>
+                
+                <div class="flex flex-wrap items-center gap-3">
+                    <!-- Source filter -->
+                    <select id="workloadSourceFilter" onchange="resetAndLoadWorkloadTable()" class="bg-slate-900 border border-borderbg rounded-lg px-3 py-1.5 text-xs text-slate-200">
+                        <option value="ALL">All Traces</option>
+                        <option value="Google_Borg">Google Borg</option>
+                        <option value="Alibaba_PAI">Alibaba PAI</option>
+                        <option value="DataCo_SupplyChain">DataCo Supply Chain</option>
+                    </select>
+
+                    <!-- Criticality filter -->
+                    <select id="criticalityFilter" onchange="resetAndLoadWorkloadTable()" class="bg-slate-900 border border-borderbg rounded-lg px-3 py-1.5 text-xs text-slate-200">
+                        <option value="ALL">All Criticality</option>
+                        <option value="1">Critical (θ=1)</option>
+                        <option value="0">Tolerant (θ=0)</option>
+                    </select>
+
+                    <!-- Search -->
+                    <input type="text" id="workloadSearchInput" oninput="resetAndLoadWorkloadTable()" placeholder="Search Task ID..." class="bg-slate-900 border border-borderbg rounded-lg px-3 py-1.5 text-xs text-slate-200 placeholder-slate-500 focus:outline-none focus:border-brand-500">
+                </div>
+            </div>
+
+            <!-- Workload Table -->
+            <div class="overflow-x-auto custom-scrollbar">
+                <table class="w-full text-left text-xs text-slate-300">
+                    <thead class="bg-slate-900 text-slate-400 uppercase font-semibold border-b border-borderbg">
+                        <tr>
+                            <th class="py-3 px-3">Task ID</th>
+                            <th class="py-3 px-3">Trace Source</th>
+                            <th class="py-3 px-3">Arrival (a<sub>i</sub>)</th>
+                            <th class="py-3 px-3">Compute (C<sub>i</sub>)</th>
+                            <th class="py-3 px-3">Payloads (D<sub>in</sub> / D<sub>out</sub>)</th>
+                            <th class="py-3 px-3">Criticality (θ<sub>i</sub>)</th>
+                            <th class="py-3 px-3">Slack (ρ)</th>
+                            <th class="py-3 px-3">Deadline (d<sub>i</sub>)</th>
+                            <th class="py-3 px-3">Sovereignty (R<sub>i</sub>)</th>
+                        </tr>
+                    </thead>
+                    <tbody id="workloadTableBody" class="divide-y divide-slate-800">
+                        <!-- Dynamic rows -->
+                    </tbody>
+                </table>
+            </div>
+
+            <div class="flex items-center justify-between pt-2 text-xs text-slate-400">
+                <span id="workloadPaginationInfo">Showing 1-15 of 3,000 tasks</span>
+                <div class="flex space-x-2">
+                    <button onclick="prevPage()" class="px-3 py-1 bg-slate-900 border border-borderbg rounded hover:bg-slate-800 text-slate-300">Previous</button>
+                    <button onclick="nextPage()" class="px-3 py-1 bg-slate-900 border border-borderbg rounded hover:bg-slate-800 text-slate-300">Next</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Infrastructure Continuum Topology Map -->
+        <div class="bg-cardbg border border-borderbg rounded-xl p-5 shadow-md space-y-4">
+            <div class="flex items-center justify-between">
+                <div>
+                    <h3 class="text-lg font-bold text-white flex items-center space-x-2">
+                        <i class="fa-solid fa-network-wired text-sky-400"></i>
+                        <span>128 Heterogeneous Compute Continuum Topology</span>
+                    </h3>
+                    <p class="text-xs text-slate-400">Edge Nodes (64), Private Data Center (32), Public Cloud AZs (32)</p>
+                </div>
+            </div>
+
+            <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
+                <!-- Tier 1: Edge Nodes -->
+                <div class="bg-slate-900 border border-borderbg rounded-lg p-4 space-y-2">
+                    <div class="flex items-center justify-between">
+                        <span class="text-sm font-bold text-amber-400"><i class="fa-solid fa-microchip mr-1.5"></i> Edge Nodes</span>
+                        <span class="px-2 py-0.5 bg-amber-950 text-amber-300 rounded text-xs">64 Nodes</span>
+                    </div>
+                    <p class="text-xs text-slate-400">4-8 ARM Cortex / Jetson Orin (15-40 GFLOPS), 8-16 GB RAM</p>
+                    <p class="text-xs text-slate-300">Power: <span class="text-white font-mono">5W → 35W</span> | Uplink: <span class="text-white font-mono">100 Mbps</span></p>
+                </div>
+
+                <!-- Tier 2: Private Data Center -->
+                <div class="bg-slate-900 border border-borderbg rounded-lg p-4 space-y-2">
+                    <div class="flex items-center justify-between">
+                        <span class="text-sm font-bold text-emerald-400"><i class="fa-solid fa-server mr-1.5"></i> Private Data Center</span>
+                        <span class="px-2 py-0.5 bg-emerald-950 text-emerald-300 rounded text-xs">32 Nodes</span>
+                    </div>
+                    <p class="text-xs text-slate-400">Dual Intel Xeon Platinum (64 Cores), 256 GB RAM</p>
+                    <p class="text-xs text-slate-300">Power: <span class="text-white font-mono">120W → 450W</span> | Link: <span class="text-white font-mono">10 Gbps</span></p>
+                </div>
+
+                <!-- Tier 3: Public Cloud Region 1 -->
+                <div class="bg-slate-900 border border-borderbg rounded-lg p-4 space-y-2">
+                    <div class="flex items-center justify-between">
+                        <span class="text-sm font-bold text-sky-400"><i class="fa-solid fa-cloud-sun mr-1.5"></i> Public Region 1 (Hydro)</span>
+                        <span class="px-2 py-0.5 bg-sky-950 text-sky-300 rounded text-xs">16 Nodes</span>
+                    </div>
+                    <p class="text-xs text-slate-400">16x AMD EPYC + NVIDIA A100/H100, 512 GB RAM</p>
+                    <p class="text-xs text-slate-300">Emissions: <span class="text-emerald-400 font-bold">35-75 gCO₂/kWh</span> (Clean Hydro)</p>
+                </div>
+
+                <!-- Tier 4: Public Cloud Region 2 -->
+                <div class="bg-slate-900 border border-borderbg rounded-lg p-4 space-y-2">
+                    <div class="flex items-center justify-between">
+                        <span class="text-sm font-bold text-rose-400"><i class="fa-solid fa-industry mr-1.5"></i> Public Region 2 (Thermal)</span>
+                        <span class="px-2 py-0.5 bg-rose-950 text-rose-300 rounded text-xs">16 Nodes</span>
+                    </div>
+                    <p class="text-xs text-slate-400">16x AMD EPYC + NVIDIA A100/H100, 512 GB RAM</p>
+                    <p class="text-xs text-slate-300">Emissions: <span class="text-rose-400 font-bold">580-820 gCO₂/kWh</span> (Thermal Peak)</p>
+                </div>
+            </div>
+        </div>
+
+    </main>
+
+    <!-- Footer -->
+    <footer class="bg-cardbg border-t border-borderbg py-4 text-center text-xs text-slate-500">
+        CASE-MTH Multi-Tier Hybrid Continuum Discrete-Event Simulation Engine &copy; 2026
+    </footer>
+
+    <!-- Dashboard Logic Script -->
+    <script>
+        let carbonChart, gridCarbonChart, energySlaChart, tierDistributionChart;
+        let currentOffset = 0;
+        const pageLimit = 15;
+
+        document.addEventListener('DOMContentLoaded', async () => {
+            initGridCarbonChart();
+            await onTaskCountChange(false);
+            await runSimulation(false); // Initial load population
+        });
+
+        async function initGridCarbonChart() {
+            try {
+                const res = await fetch('/api/grid-carbon');
+                const data = await res.json();
+
+                const ctx = document.getElementById('gridCarbonChart').getContext('2d');
+                gridCarbonChart = new Chart(ctx, {
+                    type: 'line',
+                    data: {
+                        labels: data.hours.map(h => `${h}h`),
+                        datasets: [
+                            { label: 'Private DC (Solar PPA)', data: data.series['Private_DC'], borderColor: '#22c55e', borderWidth: 2, tension: 0.3, pointRadius: 0 },
+                            { label: 'Public Region 1 (Hydro)', data: data.series['Public_Region1_Hydro'], borderColor: '#38bdf8', borderWidth: 2, tension: 0.3, pointRadius: 0 },
+                            { label: 'Public Region 2 (Thermal Peak)', data: data.series['Public_Region2_Thermal'], borderColor: '#f43f5e', borderWidth: 2, tension: 0.3, pointRadius: 0 },
+                            { label: 'Edge Micro-Grid (Battery/Diesel)', data: data.series['Edge_Grid'], borderColor: '#f59e0b', borderWidth: 1.5, tension: 0.3, pointRadius: 0 }
+                        ]
+                    },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        plugins: { legend: { labels: { color: '#94a3b8', font: { size: 10 } } } },
+                        scales: {
+                            x: { grid: { color: '#334155' }, ticks: { color: '#94a3b8', font: { size: 9 } } },
+                            y: { grid: { color: '#334155' }, ticks: { color: '#94a3b8', font: { size: 9 } }, title: { display: true, text: 'gCO₂eq/kWh', color: '#94a3b8' } }
+                        }
+                    }
+                });
+            } catch (err) {
+                console.error("Error loading grid carbon profiles:", err);
+            }
+        }
+
+        async function onTaskCountChange(randomize = false) {
+            const numTasks = parseInt(document.getElementById('taskCountSelect').value);
+            const statusSpan = document.getElementById('workload-gen-status');
+            statusSpan.innerText = randomize ? `Generating fresh ${numTasks.toLocaleString()} tasks...` : `Loading ${numTasks.toLocaleString()} tasks...`;
+
+            try {
+                const res = await fetch('/api/generate-workload', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ num_tasks: numTasks, randomize: randomize })
+                });
+                const data = await res.json();
+                statusSpan.innerText = randomize ? `Fresh data generated (Seed: ${data.seed_used}). Click 'Run Simulation' to evaluate.` : `Workload updated (${numTasks.toLocaleString()} tasks). Click 'Run Simulation' to evaluate.`;
+            } catch (err) {
+                console.error("Error generating workload:", err);
+            }
+
+            currentOffset = 0;
+            await loadWorkloadTable();
+            // Simulation is NOT run automatically here. It runs ONLY when the user clicks 'Run Simulation'.
+        }
+
+        async function runSimulation(randomize = false) {
+            const btnIcon = document.getElementById('sim-run-icon');
+            const btnText = document.getElementById('sim-run-text');
+
+            btnIcon.className = "fa-solid fa-spinner fa-spin";
+            btnText.innerText = "Simulating...";
+
+            const numTasks = parseInt(document.getElementById('taskCountSelect').value);
+            const checkboxes = document.querySelectorAll('.alg-checkbox:checked');
+            const selectedAlgs = Array.from(checkboxes).map(cb => cb.value);
+
+            try {
+                const res = await fetch('/api/run-simulation', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ num_tasks: numTasks, randomize: randomize, selected_algorithms: selectedAlgs })
+                });
+
+                const data = await res.json();
+                updateDashboardCharts(data.results, numTasks);
+            } catch (err) {
+                console.error("Simulation run failed:", err);
+            } finally {
+                btnIcon.className = "fa-solid fa-play";
+                btnText.innerText = "Run Simulation";
+            }
+        }
+
+        function updateDashboardCharts(results, numTasks) {
+            document.getElementById('kpi-tasks').innerText = numTasks.toLocaleString();
+
+            const caseRes = results.find(r => r.key === 'case_mth') || results[0];
+            if (caseRes) {
+                document.getElementById('kpi-carbon').innerHTML = `${caseRes.total_carbon_kg.toFixed(2)} <span class="text-xs font-normal">kg CO₂</span>`;
+                document.getElementById('kpi-abatement').innerText = `${caseRes.carbon_abatement_index >= 0 ? '+' : ''}${caseRes.carbon_abatement_index.toFixed(1)}% Abatement`;
+                document.getElementById('kpi-energy').innerHTML = `${caseRes.total_energy_kwh.toFixed(2)} <span class="text-xs font-normal">kWh</span>`;
+                const slaSuccess = (100 - caseRes.sla_violation_ratio).toFixed(1);
+                document.getElementById('kpi-sla').innerText = `${slaSuccess}%`;
+                document.getElementById('kpi-svr-sub').innerText = `SVR Violation: ${caseRes.sla_violation_ratio.toFixed(1)}%`;
+            }
+
+            const names = results.map(r => r.name);
+            const carbonVals = results.map(r => r.total_carbon_kg);
+            const energyVals = results.map(r => r.total_energy_kwh);
+            const svrVals = results.map(r => r.sla_violation_ratio);
+            const edgeCounts = results.map(r => r.tier_distribution.Edge || 0);
+            const privateCounts = results.map(r => r.tier_distribution.Private || 0);
+            const publicCounts = results.map(r => r.tier_distribution.Public || 0);
+
+            const colors = names.map(n => n.includes('CASE-MTH') ? '#22c55e' : '#3b82f6');
+
+            // 1. Carbon Chart
+            if (carbonChart) carbonChart.destroy();
+            const ctx1 = document.getElementById('carbonChart').getContext('2d');
+            carbonChart = new Chart(ctx1, {
+                type: 'bar',
+                data: {
+                    labels: names,
+                    datasets: [{ label: 'Carbon Emissions (kg CO₂eq)', data: carbonVals, backgroundColor: colors, borderRadius: 4 }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: { legend: { display: false } },
+                    scales: {
+                        x: { ticks: { color: '#94a3b8', font: { size: 9 } } },
+                        y: { grid: { color: '#334155' }, ticks: { color: '#94a3b8', font: { size: 9 } } }
+                    }
+                }
+            });
+
+            // 2. Energy & SLA Chart (Dual Y-Axes for clear visibility of low energy values)
+            if (energySlaChart) energySlaChart.destroy();
+            const ctx3 = document.getElementById('energySlaChart').getContext('2d');
+            energySlaChart = new Chart(ctx3, {
+                type: 'bar',
+                data: {
+                    labels: names,
+                    datasets: [
+                        {
+                            label: 'Energy Consumption (kWh)',
+                            data: energyVals,
+                            backgroundColor: '#f59e0b',
+                            borderRadius: 4,
+                            minBarLength: 12, // Guarantees minimum visible bar height for low values
+                            yAxisID: 'y'
+                        },
+                        {
+                            label: 'SVR Violation (%)',
+                            data: svrVals,
+                            backgroundColor: '#f43f5e',
+                            borderRadius: 4,
+                            minBarLength: 12,
+                            yAxisID: 'y1'
+                        }
+                    ]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: { labels: { color: '#94a3b8', font: { size: 10 } } },
+                        tooltip: {
+                            callbacks: {
+                                label: function(context) {
+                                    let label = context.dataset.label || '';
+                                    if (label) label += ': ';
+                                    if (context.dataset.yAxisID === 'y') {
+                                        label += context.raw.toFixed(2) + ' kWh';
+                                    } else {
+                                        label += context.raw.toFixed(2) + '%';
+                                    }
+                                    return label;
+                                }
+                            }
+                        }
+                    },
+                    scales: {
+                        x: { ticks: { color: '#94a3b8', font: { size: 9 } } },
+                        y: {
+                            type: 'linear',
+                            display: true,
+                            position: 'left',
+                            title: { display: true, text: 'Energy (kWh)', color: '#f59e0b', font: { size: 10, weight: 'bold' } },
+                            grid: { color: '#334155' },
+                            ticks: { color: '#f59e0b', font: { size: 9 } },
+                            beginAtZero: true
+                        },
+                        y1: {
+                            type: 'linear',
+                            display: true,
+                            position: 'right',
+                            title: { display: true, text: 'SLA Violation (%)', color: '#f43f5e', font: { size: 10, weight: 'bold' } },
+                            grid: { drawOnChartArea: false }, // Avoid overlapping grid lines
+                            ticks: { color: '#f43f5e', font: { size: 9 } },
+                            min: 0,
+                            max: 100
+                        }
+                    }
+                }
+            });
+
+            // 3. Tier Distribution Stacked Bar Chart
+            if (tierDistributionChart) tierDistributionChart.destroy();
+            const ctx4 = document.getElementById('tierDistributionChart').getContext('2d');
+            tierDistributionChart = new Chart(ctx4, {
+                type: 'bar',
+                data: {
+                    labels: names,
+                    datasets: [
+                        { label: 'Edge Tier', data: edgeCounts, backgroundColor: '#f59e0b' },
+                        { label: 'Private DC Tier', data: privateCounts, backgroundColor: '#22c55e' },
+                        { label: 'Public Cloud Tier', data: publicCounts, backgroundColor: '#38bdf8' }
+                    ]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: { legend: { labels: { color: '#94a3b8', font: { size: 10 } } } },
+                    scales: {
+                        x: { stacked: true, ticks: { color: '#94a3b8', font: { size: 9 } } },
+                        y: { stacked: true, grid: { color: '#334155' }, ticks: { color: '#94a3b8', font: { size: 9 } } }
+                    }
+                }
+            });
+        }
+
+        function resetAndLoadWorkloadTable() {
+            currentOffset = 0;
+            loadWorkloadTable();
+        }
+
+        async function loadWorkloadTable() {
+            const source = document.getElementById('workloadSourceFilter').value;
+            const criticality = document.getElementById('criticalityFilter').value;
+            const search = document.getElementById('workloadSearchInput').value;
+
+            try {
+                const res = await fetch(`/api/workload?trace_source=${source}&criticality=${criticality}&search=${search}&offset=${currentOffset}&limit=${pageLimit}`);
+                const data = await res.json();
+
+                const tbody = document.getElementById('workloadTableBody');
+                tbody.innerHTML = '';
+
+                document.getElementById('table-total-indicator').innerText = `${data.total.toLocaleString()} tasks`;
+
+                data.tasks.forEach(t => {
+                    const tr = document.createElement('tr');
+                    tr.className = "hover:bg-slate-800/50 transition";
+                    tr.innerHTML = `
+                        <td class="py-2.5 px-3 font-mono font-bold text-white">#${t.task_id}</td>
+                        <td class="py-2.5 px-3">
+                            <span class="px-2 py-0.5 rounded text-xs font-semibold ${t.source_trace === 'Google_Borg' ? 'bg-blue-950 text-blue-300' : t.source_trace === 'Alibaba_PAI' ? 'bg-purple-950 text-purple-300' : 'bg-emerald-950 text-emerald-300'}">
+                                ${t.source_trace}
+                            </span>
+                        </td>
+                        <td class="py-2.5 px-3 font-mono">${t.arrival_time}s</td>
+                        <td class="py-2.5 px-3 font-mono">${t.gflops_required} GFLOPS</td>
+                        <td class="py-2.5 px-3 font-mono text-slate-400">${t.payload_in_mb} / ${t.payload_out_mb} MB</td>
+                        <td class="py-2.5 px-3">
+                            <span class="px-1.5 py-0.5 rounded text-xs ${t.criticality_flag === 1 ? 'bg-rose-950 text-rose-400 font-bold' : 'bg-slate-800 text-slate-400'}">
+                                ${t.criticality_flag === 1 ? 'Critical (θ=1)' : 'Tolerant (θ=0)'}
+                            </span>
+                        </td>
+                        <td class="py-2.5 px-3 font-mono">${t.slack_factor}</td>
+                        <td class="py-2.5 px-3 font-mono text-amber-300">${t.deadline}s</td>
+                        <td class="py-2.5 px-3 text-slate-400">${t.sovereignty_rule}</td>
+                    `;
+                    tbody.appendChild(tr);
+                });
+
+                document.getElementById('workloadPaginationInfo').innerText = `Showing ${currentOffset + 1}-${Math.min(currentOffset + pageLimit, data.total)} of ${data.total.toLocaleString()} tasks`;
+            } catch (err) {
+                console.error("Error loading workload table:", err);
+            }
+        }
+
+        function prevPage() {
+            if (currentOffset >= pageLimit) {
+                currentOffset -= pageLimit;
+                loadWorkloadTable();
+            }
+        }
+
+        function nextPage() {
+            currentOffset += pageLimit;
+            loadWorkloadTable();
+        }
+    </script>
+</body>
+</html>
